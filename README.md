@@ -28,6 +28,37 @@ A production-grade monorepo combining local token tracking, spending dashboards,
 
 ## Quick Start
 
+### Option 1: Using the Observatory CLI (Recommended)
+
+```bash
+# Clone and setup
+git clone https://github.com/poteznyKrolik/claude-ai-observatory.git
+cd claude-ai-observatory
+
+# Install CLI (one-time)
+bash install.sh
+
+# Start all services
+observatory start
+
+# Start specific preset
+observatory start --preset analytics   # Token dashboards only
+observatory start --preset monitoring  # Observability stack
+
+# Check service health
+observatory health
+
+# View endpoints
+observatory endpoints
+
+# Stop services
+observatory stop
+```
+
+**See [CLI.md](CLI.md) for complete CLI documentation.**
+
+### Option 2: Using Docker Compose Directly
+
 ```bash
 # Clone and setup
 git clone https://github.com/poteznyKrolik/claude-ai-observatory.git
@@ -37,12 +68,7 @@ cd claude-ai-observatory
 docker compose up -d --build
 
 # Or start specific services
-docker compose up -d --build \
-  claude-transcripts \
-  codeburn \
-  claude-dashboard \
-  ai-observer \
-  tokdash-claude
+docker compose up -d --build claude-transcripts codeburn tokdash-claude
 
 # View all services
 docker compose ps
@@ -324,11 +350,13 @@ See individual service READMEs for detailed troubleshooting.
 
 ## Documentation
 
+- **CLI.md** — Complete CLI guide and command reference ⭐ (start here!)
 - **SERVICES.md** — Detailed service guide and API reference
 - **DEPLOYMENT.md** — Production deployment guide
 - **TROUBLESHOOTING.md** — Common issues and solutions
 - **tools/registry/llama/EXECUTION_SOP.md** — GGUF deployment workflow
 - **tools/registry/llama/README.md** — Model management guide
+- **tools/external/chatgpt-extractor/DOCKER_SETUP.md** — ChatGPT extractor guide
 
 ---
 
