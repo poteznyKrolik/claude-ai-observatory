@@ -1,0 +1,42 @@
+version: "3.8"
+
+services:
+  tokdash-claude:
+    build: .
+    container_name: tokdash-claude
+    restart: unless-stopped
+    command: ["--bind", "0.0.0.0", "--port", "55423", "--no-open"]
+    environment:
+      TOKDASH_USAGE_DB_PATH: /data/usage.db
+    ports:
+      - "127.0.0.1:55423:55423"
+    volumes:
+      - ~/.claude:/root/.claude:ro
+      - tokdash-claude-data:/data
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  tokdash-codex:
+    build: .
+    container_name: tokdash-codex
+    restart: unless-stopped
+    command: ["--bind", "0.0.0.0", "--port", "55424", "--no-open"]
+    environment:
+      TOKDASH_USAGE_DB_PATH: /data/usage.db
+    ports:
+      - "127.0.0.1:55424:55424"
+    volumes:
+      - ~/.codex:/root/.codex:ro
+      - tokdash-codex-data:/data
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  tokdash-claude-data:
+  tokdash-codex-data:

@@ -1,0 +1,5 @@
+{"type":"server-started","port":51474,"host":"127.0.0.1","url_host":"localhost","url":"http://localhost:51474","screen_dir":"/Users/edkubiak/Projects/personal/claude-code-dashboard/.superpowers/brainstorm/97437-1774223007"}
+{"type":"screen-added","file":"/Users/edkubiak/Projects/personal/claude-code-dashboard/.superpowers/brainstorm/97437-1774223007/plumbob-style.html"}
+{"type":"screen-added","file":"/Users/edkubiak/Projects/personal/claude-code-dashboard/.superpowers/brainstorm/97437-1774223007/character-approach.html"}
+{"type":"screen-added","file":"/Users/edkubiak/Projects/personal/claude-code-dashboard/.superpowers/brainstorm/97437-1774223007/waiting.html"}
+{"type":"server-stopped","reason":"idle timeout"}

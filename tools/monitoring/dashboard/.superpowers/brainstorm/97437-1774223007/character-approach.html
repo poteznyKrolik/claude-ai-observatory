@@ -1,0 +1,146 @@
+<h2>Character Per Agent — How Distinct?</h2>
+<p class="subtitle">Currently 28 agents share 7 archetype templates (same sprite, different colors). How unique should each character be?</p>
+
+<style>
+  .pixel-grid {
+    display: grid;
+    image-rendering: pixelated;
+    flex-shrink: 0;
+  }
+  .pixel-cell { display: block; }
+
+  .sprite-row { display: flex; gap: 10px; align-items: flex-end; justify-content: center; margin: 16px 0; flex-wrap: wrap; }
+  .sprite-item { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .sprite-name { font-size: 7px; font-family: 'Courier New', monospace; color: #88A3D6; text-transform: uppercase; letter-spacing: 0.05em; text-align: center; }
+
+  .badge { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 9px; font-family: monospace; font-weight: bold; text-transform: uppercase; margin-top: 4px; }
+</style>
+
+<script>
+  function makeSprite(template, accent, scale) {
+    const palette = { '.': '', 'K': '#0d1117', 'B': accent, 'S': '#FFDBAC', 'E': '#1a1a2e', 'W': '#ffffff' };
+    const rows = template.length;
+    const cols = template[0].length;
+    const grid = document.createElement('div');
+    grid.className = 'pixel-grid';
+    grid.style.gridTemplateColumns = `repeat(${cols}, ${scale}px)`;
+    grid.style.gridTemplateRows = `repeat(${rows}, ${scale}px)`;
+    for (const row of template) {
+      for (const ch of [...row.padEnd(cols, '.')]) {
+        const cell = document.createElement('div');
+        cell.className = 'pixel-cell';
+        cell.style.width = scale + 'px';
+        cell.style.height = scale + 'px';
+        cell.style.backgroundColor = palette[ch] || 'transparent';
+        grid.appendChild(cell);
+      }
+    }
+    return grid;
+  }
+
+  // ARCHETYPE SPRITES (current system)
+  const strategist = ['..KBBK..', '.KBBBK..', '.KBBBK..', '..KSSK..', '...KK...', '..KBBK..', '.KBBBBK.', '.KBBBBK.', '..KK.KK.', '.KKK.KKK'];
+  const detective  = ['........', '.KKKKKK.', 'KBBBBBKK', '.KBBBK..', '..KSSK..', '...KK...', '..KBBK..', '.KBBBBK.', '..KK.KK.', '.KKK.KKK'];
+  const builder    = ['..KBBK..', '.KBBBBK.', 'KBBBBBBK', '..KSSK..', '...KK...', '..KBBK..', '.KBBBBK.', '.KBBBBK.', '..KK.KK.', '.KKK.KKK'];
+  const scientist  = ['..KBBK..', '.KWWWKK.', '.KWWWKK.', '..KSSK..', '...KK...', '.KWWWWK.', 'KWWWWWWK', 'KWWWWWWK', '..KK.KK.', '.KKK.KKK'];
+  const scribe     = ['..KBBK..', 'KBBBBBBK', '.KBBBKK.', '..KSSK..', '...KK...', '..KBBK..', '.KBBBBK.', '.KBBBBK.', '..KK.KK.', '.KKK.KKK'];
+  const operative  = ['.KBBBBK.', 'KBSSSSKK', 'KBSSSSKK', '.KKSSKK.', '...KK...', '..KBBK..', '.KBBBBK.', '.KBBBBK.', '..KK.KK.', '.KKK.KKK'];
+
+  // UNIQUE character sprites (same palette, different designs for each)
+  const planner_unique    = ['..KBBK..', '.KBBBK..', '.KBBBK..', '..KSSK..', '...KK...', '.KBWWBK.', 'KBWBBWBK', 'KBWBBWBK', '..KK.KK.', '.KKK.KKK']; // clipboard/blueprint dots on chest
+  const debugger_unique   = ['.KKKKKK.', 'KBBBBBBK', '.KBBBK..', '..KSSK..', '...KK...', '.KBWWBK.', 'KBW..WBK', 'KBW..WBK', '..KK.KK.', '.KKK.KKK']; // wide fedora
+  const testwriter_unique = ['..KBBK..', '.KWWWKK.', '.KWWWKK.', '..KSSEK.', '...KK...', '.KWWWWK.', 'KWBBWWWK', 'KWBBWWWK', '..KK.KK.', '.KKK.KKK']; // lab coat w/ badge
+  const commit_unique     = ['..KBBK..', 'KBBBBBBK', '.KBBBKK.', '..KSSKK.', '...KK...', '..KBBK..', '.KBWWBK.', '.KBWWBK.', '..KK.KK.', '.KKK.KKK']; // mortarboard, tie/award
+  const security_unique   = ['.KBBBBK.', 'KBSSSSKK', 'KBSSSSKK', '.KKSSKK.', '...KK...', '.KWBBWK.', 'KWBKKBWK', 'KWBKKBWK', '..KK.KK.', '.KKK.KKK']; // hood, shield emblem
+  const architect_unique  = ['..KBBK..', '.KBBBK..', '.KBBBK..', '.KKSSKK.', '...KK...', '.KBWWBK.', 'KBBWWBBK', 'KBBWWBBK', '..KK.KK.', '.KKK.KKK']; // wizard hat, blueprints
+
+  window.addEventListener('DOMContentLoaded', () => {
+    // Row A: same archetype, different colors (current)
+    const currentRow = document.getElementById('current-row');
+    const agents_current = [
+      { t: strategist, c: '#60A5FA', n: 'planner' },
+      { t: detective,  c: '#F59E0B', n: 'debugger' },
+      { t: scientist,  c: '#84CC16', n: 'test-writer' },
+      { t: scribe,     c: '#FBBF24', n: 'commit' },
+      { t: operative,  c: '#A855F7', n: 'security' },
+      { t: strategist, c: '#00FFC2', n: 'architect' },
+    ];
+    for (const a of agents_current) {
+      const item = document.createElement('div');
+      item.className = 'sprite-item';
+      item.appendChild(makeSprite(a.t, a.c, 3));
+      const lbl = document.createElement('div');
+      lbl.className = 'sprite-name';
+      lbl.style.color = a.c;
+      lbl.textContent = a.n;
+      item.appendChild(lbl);
+      currentRow.appendChild(item);
+    }
+
+    // Row B: unique sprites
+    const uniqueRow = document.getElementById('unique-row');
+    const agents_unique = [
+      { t: planner_unique,    c: '#60A5FA', n: 'planner' },
+      { t: debugger_unique,   c: '#F59E0B', n: 'debugger' },
+      { t: testwriter_unique, c: '#84CC16', n: 'test-writer' },
+      { t: commit_unique,     c: '#FBBF24', n: 'commit' },
+      { t: security_unique,   c: '#A855F7', n: 'security' },
+      { t: architect_unique,  c: '#00FFC2', n: 'architect' },
+    ];
+    for (const a of agents_unique) {
+      const item = document.createElement('div');
+      item.className = 'sprite-item';
+      item.appendChild(makeSprite(a.t, a.c, 3));
+      const lbl = document.createElement('div');
+      lbl.className = 'sprite-name';
+      lbl.style.color = a.c;
+      lbl.textContent = a.n;
+      item.appendChild(lbl);
+      uniqueRow.appendChild(item);
+    }
+  });
+</script>
+
+<div class="options">
+
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Same Archetype, More Colors</h3>
+      <p>Keep the 7 archetype body shapes. Each agent is already color-distinct. Fastest to ship — zero new sprites needed.</p>
+      <div id="current-row" class="sprite-row"></div>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul><li>No sprite work</li><li>Already done</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Agents in same dept look similar</li><li>Less "character"</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Unique Sprites Per Agent</h3>
+      <p>28 hand-crafted 8×10 pixel people — each with a role-specific look (tools, clothing, hat style). Same palette system.</p>
+      <div id="unique-row" class="sprite-row"></div>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul><li>Each agent feels like a real character</li><li>Recognizable by look alone</li><li>Gallery-worthy</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>28 sprites to design</li><li>Largest scope addition</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Hybrid — Archetype Variants</h3>
+      <p>Keep 7 archetypes but add 2-3 visual variants within each (different hair, tools, accessories). ~15 sprite designs total.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul><li>More variety than current</li><li>Half the design work of B</li><li>Dept clusters still look related</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Still some agent overlap</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="text-align:center; margin-top:8px;">Note: Option B (unique sprites) is the highest-quality outcome but the most design work. Worth it if you want CAST to feel like a real cast of characters.</p>

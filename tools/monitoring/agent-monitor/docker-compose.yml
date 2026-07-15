@@ -1,0 +1,25 @@
+version: "3.8"
+
+services:
+  claude-agent-monitor:
+    build: .
+    container_name: claude-agent-monitor
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:4820:4820"
+    volumes:
+      - ~/.claude:/root/.claude:ro
+      - claude-agent-monitor-data:/app/data
+    environment:
+      NODE_ENV: production
+      CLAUDE_HOME: /root/.claude
+      DASHBOARD_HOST: 0.0.0.0
+      DASHBOARD_PORT: "4820"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  claude-agent-monitor-data:

@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en" style="height: 100%">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>CAST Dashboard</title>
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('cast-theme');
+          if (t !== 'light' && t !== 'dark') {
+            t = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+          }
+          var el = document.documentElement;
+          el.classList.remove('light', 'dark');
+          el.classList.add(t);
+          el.style.backgroundColor = t === 'light' ? '#F4F6FA' : '#070A0F';
+        } catch (e) {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
+  </head>
+  <body style="height: 100%">
+    <div id="root" style="height: 100%"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,43 @@
+#!/usr/bin/env kitops
+
+# KitOps ModelKit Definition
+# Packages GGUF model + operational documentation into OCI-compliant artifact
+
+modelkit:
+  name: llama-model-registry
+  version: 1.0.0
+  description: "Pure llama.cpp GGUF model with operational documentation"
+  authors:
+    - name: "DevOps Team"
+      email: "ops@example.com"
+
+# Pack the model artifact and documentation
+pack:
+  # Include the GGUF model file(s) from ./models/
+  # Example: models/model.gguf or models/*.gguf
+  # The server will unpack this to /models/ in the container
+  - source: ./models/*.gguf
+    destination: models/
+
+  # Include the Standard Operating Procedure
+  - source: ./models/model_sop.md
+    destination: models/model_sop.md
+
+  # Optional: Include config template for reproducibility
+  - source: ./docker-compose.yml
+    destination: docker-compose.reference.yml
+
+  # Optional: Include execution guide
+  - source: ./EXECUTION_SOP.md
+    destination: EXECUTION_SOP.md
+
+# Metadata tags for registry discovery
+tags:
+  - llama.cpp
+  - gguf
+  - local-deployment
+  - production
+
+# Optional: Configuration hints for unpacking
+config:
+  compression: gzip

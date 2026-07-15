@@ -1,0 +1,24 @@
+version: "3.8"
+
+services:
+  claude-dashboard:
+    build: .
+    container_name: claude-dashboard
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5173:5173"
+      - "127.0.0.1:3001:3001"
+    volumes:
+      - ~/.claude:/root/.claude:ro
+      - claude-dashboard-data:/app/data
+    environment:
+      NODE_ENV: production
+      VITE_API_URL: http://localhost:3001
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  claude-dashboard-data:

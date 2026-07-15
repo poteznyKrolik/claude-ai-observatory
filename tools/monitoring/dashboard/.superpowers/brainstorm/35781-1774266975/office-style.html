@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>CAST HQ — Living Office Style</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0a0a0f; color: #e2e8f0; font-family: 'Courier New', monospace; padding: 24px; }
+
+  h2 { color: #00ffc2; font-size: 18px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 2px; }
+  .subtitle { color: #94a3b8; font-size: 13px; margin-bottom: 28px; }
+
+  .approaches { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 28px; }
+
+  .card {
+    background: #111827;
+    border: 2px solid #1e293b;
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color 0.2s, transform 0.1s;
+  }
+  .card:hover { border-color: #00ffc2; transform: translateY(-2px); }
+  .card.selected { border-color: #00ffc2; background: #0d1f1a; }
+
+  .card-preview {
+    height: 220px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .card-body { padding: 14px 16px; }
+  .card-body h3 { font-size: 13px; color: #00ffc2; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .card-body p { font-size: 11px; color: #94a3b8; line-height: 1.5; }
+  .badge { display: inline-block; background: #1e293b; color: #64748b; font-size: 10px; padding: 2px 8px; border-radius: 4px; margin-top: 8px; }
+  .badge.hard { background: #2d1a1a; color: #f87171; }
+  .badge.med { background: #1a2a1a; color: #86efac; }
+  .badge.easy { background: #1a1a2d; color: #818cf8; }
+
+  canvas { display: block; }
+
+  .note { background: #0f172a; border: 1px solid #1e293b; border-radius: 6px; padding: 14px 18px; font-size: 12px; color: #64748b; line-height: 1.7; margin-top: 4px; }
+  .note strong { color: #94a3b8; }
+
+  .select-hint { text-align: center; font-size: 11px; color: #475569; margin-top: 12px; }
+</style>
+</head>
+<body>
+
+<h2>How alive should the office be?</h2>
+<p class="subtitle">Three design directions for the Pokemon-style CAST HQ — click one to select</p>
+
+<div class="approaches">
+
+  <!-- Option A: Enhanced Pixel Room -->
+  <div class="card" data-choice="a" onclick="selectCard(this)">
+    <div class="card-preview">
+      <canvas id="canvasA" width="320" height="220"></canvas>
+    </div>
+    <div class="card-body">
+      <h3>A — Pixel Room, Rich Desks</h3>
+      <p>Agents stay at fixed desks in a tile-drawn office room. Desk items animate (monitors flicker, coffee steams, keyboards clack). Agent sprites have many more animation frames — typing, sleeping, celebrating, talking.</p>
+      <span class="badge easy">Lowest complexity</span>
+    </div>
+  </div>
+
+  <!-- Option B: Walking World -->
+  <div class="card" data-choice="b" onclick="selectCard(this)">
+    <div class="card-preview">
+      <canvas id="canvasB" width="320" height="220"></canvas>
+    </div>
+    <div class="card-body">
+      <h3>B — Walking Agents</h3>
+      <p>Agents walk freely around the office floor. They move to workstations when assigned tasks, gather at a meeting table when chained together, and wander when idle. Full 4-directional walk cycles.</p>
+      <span class="badge med">Medium complexity</span>
+    </div>
+  </div>
+
+  <!-- Option C: Game Engine World -->
+  <div class="card" data-choice="c" onclick="selectCard(this)">
+    <div class="card-preview">
+      <canvas id="canvasC" width="320" height="220"></canvas>
+    </div>
+    <div class="card-body">
+      <h3>C — Full Game World</h3>
+      <p>A scrollable multi-room office built with Phaser.js or a custom tilemap engine. Departments become rooms. Agents travel between rooms. Dialog boxes, interaction zones, and event scripting — exactly like a Pokemon overworld.</p>
+      <span class="badge hard">Highest complexity</span>
+    </div>
+  </div>
+
+</div>
+
+<div class="note">
+  <strong>Current approach:</strong> AgentOffice.tsx uses DOM-based CSS sprites (80 divs/agent, 28 agents = 2,240 DOM nodes) with Framer Motion physics. A Game Boy–style office would replace or sit alongside this. All three options use HTML5 Canvas for the game world itself.
+</div>
+
+<p class="select-hint">Click a card to select, then reply in the terminal</p>
+
+<script>
+// ── Shared pixel palette ──────────────────────────────────────────────────
+const FLOOR = '#1a1a2e';
+const FLOOR2 = '#16213e';
+const WALL = '#0f3460';
+const WALL_TOP = '#1a4a7a';
+const DESK = '#2d4a3e';
+const DESK_DARK = '#1e3a2e';
+const MONITOR = '#0a0a1a';
+const MONITOR_ON = '#00ffc2';
+const PLANT = '#2d6a2d';
+const CHAIR = '#3a2d5a';
+const CARPET = '#1e1e3e';
+const DOOR = '#8b6914';
+
+function px(ctx, x, y, w, h, color) {
+  ctx.fillStyle = color;
+  ctx.fillRect(x, y, w, h);
+}
+
+// ── Option A: Enhanced Pixel Room ─────────────────────────────────────────
+(function() {
+  const c = document.getElementById('canvasA');
+  const ctx = c.getContext('2d');
+  const S = 10; // tile size
+  let t = 0;
+
+  // Static agent positions (desk-bound)
+  const agents = [
+    { x: 3, y: 3, color: '#00ffc2', label: 'plan' },
+    { x: 8, y: 3, color: '#818cf8', label: 'debug' },
+    { x: 13, y: 3, color: '#f87171', label: 'test' },
+    { x: 3, y: 8, color: '#fbbf24', label: 'commit' },
+    { x: 8, y: 8, color: '#a78bfa', label: 'arch' },
+    { x: 13, y: 8, color: '#34d399', label: 'sec' },
+  ];
+
+  function drawRoom(t) {
+    ctx.clearRect(0, 0, c.width, c.height);
+
+    // Floor tiles (checkerboard)
+    for (let row = 0; row < 22; row++) {
+      for (let col = 0; col < 32; col++) {
+        ctx.fillStyle = (row + col) % 2 === 0 ? FLOOR : FLOOR2;
+        ctx.fillRect(col * S, row * S, S, S);
+      }
+    }
+
+    // Carpet strip
+    ctx.fillStyle = CARPET;
+    ctx.fillRect(0, 5 * S, 32 * S, S);
+    ctx.fillRect(0, 11 * S, 32 * S, S);
+
+    // Wall top
+    ctx.fillStyle = WALL;
+    ctx.fillRect(0, 0, 32 * S, 2 * S);
+    ctx.fillStyle = WALL_TOP;
+    ctx.fillRect(0, S, 32 * S, 4);
+
+    // Plant in corner
+    ctx.fillStyle = '#4a3000'; ctx.fillRect(1*S, 2*S+2, 6, 8);
+    ctx.fillStyle = PLANT; ctx.fillRect(S-2, S+2, 14, 10);
+    ctx.fillStyle = '#3d8b3d'; ctx.fillRect(S, S+4, 10, 6);
+
+    // Draw desks + agents
+    agents.forEach((ag, i) => {
+      const px = ag.x * S;
+      const py = ag.y * S;
+      const frame = Math.floor(t / 15) % 2;
+
+      // Desk
+      ctx.fillStyle = DESK_DARK; ctx.fillRect(px-S, py, 3*S, 2*S);
+      ctx.fillStyle = DESK; ctx.fillRect(px-S+2, py+2, 3*S-4, 2*S-4);
+
+      // Monitor
+      ctx.fillStyle = MONITOR; ctx.fillRect(px, py+2, S+2, S-2);
+      // Monitor glow (flickers)
+      const flicker = Math.sin(t * 0.3 + i * 1.7) > 0.8 ? 0.6 : 1;
+      ctx.fillStyle = ag.color;
+      ctx.globalAlpha = flicker * 0.9;
+      ctx.fillRect(px+2, py+4, S-2, S-6);
+      ctx.globalAlpha = 1;
+
+      // Chair
+      ctx.fillStyle = CHAIR; ctx.fillRect(px-2, py+2*S, S+4, 6);
+
+      // Agent sprite (simple 5x5 pixel character at desk)
+      const spriteY = py + S + 4;
+      const spriteX = px - 4;
+      // Head
+      ctx.fillStyle = '#f5d0a9'; ctx.fillRect(spriteX+4, spriteY, 8, 8);
+      // Eyes (blink)
+      const blink = Math.floor(t / 60) % 8 === 0;
+      ctx.fillStyle = '#1a1a1a';
+      if (!blink) {
+        ctx.fillRect(spriteX+5, spriteY+3, 2, 2);
+        ctx.fillRect(spriteX+9, spriteY+3, 2, 2);
+      } else {
+        ctx.fillRect(spriteX+5, spriteY+4, 2, 1);
+        ctx.fillRect(spriteX+9, spriteY+4, 2, 1);
+      }
+      // Body
+      ctx.fillStyle = ag.color; ctx.globalAlpha = 0.85;
+      ctx.fillRect(spriteX+2, spriteY+8, 12, 8);
+      ctx.globalAlpha = 1;
+      // Arms (typing animation)
+      const armOffset = frame === 0 ? 0 : 1;
+      ctx.fillStyle = '#f5d0a9';
+      ctx.fillRect(spriteX+1, spriteY+9+armOffset, 3, 4);
+      ctx.fillRect(spriteX+12, spriteY+9+armOffset, 3, 4);
+
+      // Coffee steam
+      const steamAlpha = (Math.sin(t * 0.05 + i) * 0.5 + 0.5) * 0.4;
+      ctx.fillStyle = '#ffffff'; ctx.globalAlpha = steamAlpha;
+      ctx.fillRect(px-S+4, py-3, 2, 3);
+      ctx.fillRect(px-S+7, py-5, 2, 2);
+      ctx.globalAlpha = 1;
+
+      // Label
+      ctx.fillStyle = ag.color;
+      ctx.font = '7px Courier New';
+      ctx.fillText(ag.label, px - S + 2, py + 2*S + 14);
+    });
+
+    // Door
+    ctx.fillStyle = DOOR; ctx.fillRect(16*S, 0, 2*S, 2*S);
+    ctx.fillStyle = '#5a4010'; ctx.fillRect(17*S-2, S+2, 4, 6);
+  }
+
+  function loop() {
+    t++;
+    drawRoom(t);
+    requestAnimationFrame(loop);
+  }
+  loop();
+})();
+
+// ── Option B: Walking Agents ───────────────────────────────────────────────
+(function() {
+  const c = document.getElementById('canvasB');
+  const ctx = c.getContext('2d');
+  const S = 10;
+  let t = 0;
+
+  const agents = [
+    { x: 50, y: 40, tx: 50, ty: 40, color: '#00ffc2', dir: 0, walk: 0, idle: 180, label: 'plan' },
+    { x: 130, y: 40, tx: 130, ty: 40, color: '#818cf8', dir: 2, walk: 0, idle: 60, label: 'debug' },
+    { x: 200, y: 60, tx: 200, ty: 60, color: '#f87171', dir: 1, walk: 0, idle: 240, label: 'test' },
+    { x: 80, y: 130, tx: 80, ty: 130, color: '#fbbf24', dir: 3, walk: 0, idle: 120, label: 'commit' },
+    { x: 160, y: 100, tx: 160, ty: 100, color: '#a78bfa', dir: 0, walk: 0, idle: 90, label: 'arch' },
+    { x: 240, y: 150, tx: 240, ty: 150, color: '#34d399', dir: 2, walk: 0, idle: 30, label: 'sec' },
+  ];
+
+  // Waypoints (desk positions)
+  const desks = [
+    [50,40],[130,40],[200,60],[80,130],[160,100],[240,150],
+    [100,80],[220,110],[60,160],[180,160]
+  ];
+
+  agents.forEach((ag, i) => {
+    setInterval(() => {
+      const dest = desks[Math.floor(Math.random() * desks.length)];
+      ag.tx = dest[0]; ag.ty = dest[1];
+    }, 2000 + i * 800);
+  });
+
+  function drawWalkingRoom(t) {
+    ctx.clearRect(0, 0, c.width, c.height);
+
+    // Floor
+    for (let row = 0; row < 22; row++) {
+      for (let col = 0; col < 32; col++) {
+        ctx.fillStyle = (row + col) % 2 === 0 ? FLOOR : FLOOR2;
+        ctx.fillRect(col * S, row * S, S, S);
+      }
+    }
+
+    // Wall
+    ctx.fillStyle = WALL; ctx.fillRect(0, 0, 32*S, S*2);
+    ctx.fillStyle = WALL_TOP; ctx.fillRect(0, S, 32*S, 4);
+
+    // Static desks
+    desks.forEach(([dx, dy]) => {
+      ctx.fillStyle = DESK_DARK; ctx.fillRect(dx-8, dy-4, 24, 16);
+      ctx.fillStyle = DESK; ctx.fillRect(dx-6, dy-2, 20, 12);
+      ctx.fillStyle = MONITOR; ctx.fillRect(dx, dy-2, 10, 8);
+      ctx.fillStyle = '#00aa88'; ctx.globalAlpha = 0.6;
+      ctx.fillRect(dx+1, dy, 8, 5);
+      ctx.globalAlpha = 1;
+    });
+
+    // Move + draw agents
+    agents.forEach((ag, i) => {
+      // Move toward target
+      const dx = ag.tx - ag.x;
+      const dy = ag.ty - ag.y;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      if (dist > 1) {
+        const speed = 1.2;
+        ag.x += (dx / dist) * speed;
+        ag.y += (dy / dist) * speed;
+        ag.walk = Math.floor(t / 8) % 4;
+        if (Math.abs(dx) > Math.abs(dy)) ag.dir = dx > 0 ? 1 : 3;
+        else ag.dir = dy > 0 ? 2 : 0;
+      } else {
+        ag.walk = 0;
+      }
+
+      // Shadow
+      ctx.fillStyle = '#000'; ctx.globalAlpha = 0.25;
+      ctx.beginPath();
+      ctx.ellipse(ag.x+6, ag.y+17, 7, 3, 0, 0, Math.PI*2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+
+      // Legs (walk cycle)
+      const walkFrame = ag.walk;
+      ctx.fillStyle = '#334155';
+      if (walkFrame === 1 || walkFrame === 3) {
+        ctx.fillRect(ag.x+2, ag.y+13, 4, 5);
+        ctx.fillRect(ag.x+7, ag.y+13, 4, 5);
+      } else {
+        ctx.fillRect(ag.x+3, ag.y+13, 4, 5);
+        ctx.fillRect(ag.x+6, ag.y+13, 4, 5);
+      }
+
+      // Body
+      ctx.fillStyle = ag.color; ctx.globalAlpha = 0.9;
+      ctx.fillRect(ag.x+1, ag.y+7, 11, 8);
+      ctx.globalAlpha = 1;
+
+      // Head
+      ctx.fillStyle = '#f5d0a9'; ctx.fillRect(ag.x+2, ag.y, 10, 8);
+      ctx.fillStyle = '#1a1a1a';
+      ctx.fillRect(ag.x+4, ag.y+3, 2, 2);
+      ctx.fillRect(ag.x+8, ag.y+3, 2, 2);
+
+      // Name badge
+      ctx.fillStyle = ag.color;
+      ctx.font = '7px Courier New';
+      ctx.fillText(ag.label, ag.x, ag.y - 2);
+    });
+
+    // Door
+    ctx.fillStyle = DOOR; ctx.fillRect(160, 0, 20, 20);
+    ctx.fillStyle = '#5a4010'; ctx.fillRect(168, 12, 4, 6);
+  }
+
+  function loop() {
+    t++;
+    drawWalkingRoom(t);
+    requestAnimationFrame(loop);
+  }
+  loop();
+})();
+
+// ── Option C: Multi-room Phaser-style ────────────────────────────────────
+(function() {
+  const c = document.getElementById('canvasC');
+  const ctx = c.getContext('2d');
+  const S = 10;
+  let t = 0;
+  let cam = 0; // camera scroll
+
+  const rooms = [
+    { name: 'Core Ops', x: 0, color: '#00ffc2', agents: ['plan','debug','test','commit'] },
+    { name: 'Extended', x: 320, color: '#818cf8', agents: ['arch','tdd','build','e2e'] },
+    { name: 'Orchestration', x: 640, color: '#fbbf24', agents: ['orch','stage','verify','report'] },
+  ];
+
+  const walkers = [
+    { x: 60, y: 100, tx: 200, ty: 80, color: '#00ffc2', walk: 0, dir: 1, room: 0, label: 'plan' },
+    { x: 420, y: 120, tx: 420, ty: 120, color: '#818cf8', walk: 0, dir: 0, room: 1, label: 'arch' },
+    { x: 700, y: 90, tx: 700, ty: 90, color: '#fbbf24', walk: 0, dir: 2, room: 2, label: 'orch' },
+    { x: 280, y: 100, tx: 370, ty: 100, color: '#f87171', walk: 0, dir: 1, room: 0, label: 'debug' },
+  ];
+
+  // Slow camera scroll
+  setInterval(() => {
+    const targets = [0, 160, 320];
+    cam = targets[Math.floor(Math.random() * targets.length)];
+  }, 3500);
+
+  let currentCam = 0;
+
+  function drawMultiRoom(t) {
+    ctx.clearRect(0, 0, c.width, c.height);
+
+    // Smooth camera
+    currentCam += (cam - currentCam) * 0.04;
+
+    ctx.save();
+    ctx.translate(-currentCam, 0);
+
+    // Draw 3 rooms side by side
+    rooms.forEach((room, ri) => {
+      const rx = room.x;
+
+      // Floor
+      for (let row = 0; row < 22; row++) {
+        for (let col = 0; col < 32; col++) {
+          ctx.fillStyle = (row + col) % 2 === 0 ? FLOOR : FLOOR2;
+          ctx.fillRect(rx + col * S, row * S, S, S);
+        }
+      }
+
+      // Wall
+      ctx.fillStyle = WALL; ctx.fillRect(rx, 0, 320, S*2);
+      ctx.fillStyle = room.color; ctx.globalAlpha = 0.15;
+      ctx.fillRect(rx, 0, 320, S*2);
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = WALL_TOP; ctx.fillRect(rx, S, 320, 4);
+
+      // Room label on wall
+      ctx.fillStyle = room.color; ctx.globalAlpha = 0.9;
+      ctx.font = 'bold 9px Courier New';
+      ctx.fillText(room.name, rx + 10, 16);
+      ctx.globalAlpha = 1;
+
+      // Door to next room (right wall)
+      if (ri < 2) {
+        ctx.fillStyle = DOOR; ctx.fillRect(rx + 300, 60, 14, 30);
+        ctx.fillStyle = '#5a4010'; ctx.fillRect(rx + 309, 74, 3, 8);
+      }
+
+      // Desks (4 per room)
+      room.agents.forEach((ag, ai) => {
+        const dx = rx + 40 + (ai % 2) * 120;
+        const dy = 60 + Math.floor(ai / 2) * 80;
+        ctx.fillStyle = DESK_DARK; ctx.fillRect(dx, dy, 80, 40);
+        ctx.fillStyle = DESK; ctx.fillRect(dx+4, dy+4, 72, 32);
+        ctx.fillStyle = MONITOR; ctx.fillRect(dx+20, dy+6, 30, 20);
+        ctx.fillStyle = room.color; ctx.globalAlpha = 0.7;
+        ctx.fillRect(dx+22, dy+8, 26, 14);
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = room.color; ctx.font = '7px Courier New';
+        ctx.fillText(ag, dx+4, dy+50);
+      });
+
+      // Partition walls between desks
+      ctx.fillStyle = '#1a2a3a'; ctx.globalAlpha = 0.6;
+      ctx.fillRect(rx + 110, 40, 6, 160);
+      ctx.globalAlpha = 1;
+    });
+
+    // Draw walking agents
+    walkers.forEach((ag) => {
+      const dx2 = ag.tx - ag.x;
+      const dy2 = ag.ty - ag.y;
+      const dist = Math.sqrt(dx2*dx2 + dy2*dy2);
+      if (dist > 1) {
+        ag.x += (dx2 / dist) * 0.8;
+        ag.y += (dy2 / dist) * 0.8;
+        ag.walk = Math.floor(t / 10) % 4;
+      }
+
+      // Shadow
+      ctx.fillStyle = '#000'; ctx.globalAlpha = 0.2;
+      ctx.beginPath(); ctx.ellipse(ag.x+5, ag.y+16, 6, 3, 0, 0, Math.PI*2); ctx.fill();
+      ctx.globalAlpha = 1;
+
+      // Body
+      ctx.fillStyle = ag.color; ctx.globalAlpha = 0.85;
+      ctx.fillRect(ag.x+1, ag.y+6, 10, 8);
+      ctx.globalAlpha = 1;
+      // Head
+      ctx.fillStyle = '#f5d0a9'; ctx.fillRect(ag.x+2, ag.y, 8, 7);
+      ctx.fillStyle = '#1a1a1a'; ctx.fillRect(ag.x+3, ag.y+3, 2, 2); ctx.fillRect(ag.x+7, ag.y+3, 2, 2);
+      // Legs
+      ctx.fillStyle = '#334155';
+      if (ag.walk % 2 === 0) { ctx.fillRect(ag.x+2, ag.y+13, 3, 4); ctx.fillRect(ag.x+7, ag.y+13, 3, 4); }
+      else { ctx.fillRect(ag.x+3, ag.y+13, 3, 4); ctx.fillRect(ag.x+6, ag.y+13, 3, 4); }
+
+      ctx.fillStyle = ag.color; ctx.font = '7px Courier New'; ctx.fillText(ag.label, ag.x, ag.y-2);
+    });
+
+    // Room divider lines
+    ctx.fillStyle = '#0f3460'; ctx.globalAlpha = 0.5;
+    ctx.fillRect(318, 0, 4, 220);
+    ctx.fillRect(638, 0, 4, 220);
+    ctx.globalAlpha = 1;
+
+    ctx.restore();
+
+    // Camera indicator
+    ctx.fillStyle = '#1e293b'; ctx.fillRect(10, c.height-16, 80, 10);
+    const camPct = currentCam / 320;
+    ctx.fillStyle = '#00ffc2'; ctx.globalAlpha = 0.8;
+    ctx.fillRect(12, c.height-14, camPct * 76, 6);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#475569'; ctx.font = '7px Courier New';
+    ctx.fillText('SCROLL', 14, c.height-7);
+  }
+
+  function loop() {
+    t++;
+    drawMultiRoom(t);
+    requestAnimationFrame(loop);
+  }
+  loop();
+})();
+
+function selectCard(el) {
+  document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  if (window.__superpowers_helper) {
+    window.__superpowers_helper.recordSelection(el.dataset.choice, el.querySelector('h3').textContent);
+  }
+}
+</script>
+</body>
+</html>

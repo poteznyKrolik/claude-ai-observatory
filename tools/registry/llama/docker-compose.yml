@@ -1,0 +1,194 @@
+version: "3.8"
+
+services:
+  # ────────────────────────────────────────────────────────────────────────────
+  # KitOps Service: Build, version, and unpack ModelKit artifacts
+  # ────────────────────────────────────────────────────────────────────────────
+  kitops:
+    image: ghcr.io/jozu/kitops:latest
+    container_name: gguf-kitops-builder
+    restart: "no"
+    volumes:
+      - ./Kitfile:/workspace/Kitfile:ro
+      - ./models:/workspace/models:rw
+      - kitops-cache:/root/.kit
+    working_dir: /workspace
+    command: >
+      sh -c "
+        echo '=== KitOps ModelKit Builder ===' &&
+        kit version &&
+        echo '' &&
+        echo 'Building ModelKit from Kitfile...' &&
+        kit pack -f Kitfile --output modelkit.tar &&
+        echo 'ModelKit built: modelkit.tar' &&
+        echo '' &&
+        echo 'To push to registry, run:' &&
+        echo '  kit push modelkit.tar:latest <registry>/llama-models:latest'
+      "
+    # Run manually with: docker compose run kitops kit pack -f Kitfile
+    stdin_open: true
+    tty: true
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # llama.cpp Server: Raw GGUF inference with explicit hardware tuning
+  # ────────────────────────────────────────────────────────────────────────────
+  llama-cpp-server:
+    image: ghcr.io/ggerganov/llama.cpp:server
+    container_name: gguf-llama-server
+    restart: unless-stopped
+
+    ports:
+      - "127.0.0.1:8000:8000"  # llama.cpp HTTP server + OpenAI-compatible API
+      - "127.0.0.1:8001:8001"  # Optional: metrics/debug endpoint
+
+    volumes:
+      # Mount models directory (read-only for safety)
+      - ./models:/models:ro
+
+      # Optional: Mount cache for KV optimization
+      - llama-cache:/cache
+
+    environment:
+      # ─── Model Loading ─────────────────────────────────────────────────────
+      # Path to GGUF model (adjust to your actual model filename)
+      MODEL: /models/model.gguf
+
+      # ─── Context & Sequence ────────────────────────────────────────────────
+      # Context window size (tokens). Safe default: 2048. Max observed: 8192
+      # Increases VRAM usage proportionally
+      N_CTX: "2048"
+
+      # Batch size for token generation (balance latency vs throughput)
+      # Recommended: 512. Range: 128–2048
+      # Higher = more parallelism but higher VRAM/RAM
+      N_BATCH: "512"
+
+      # ─── Threading & CPU Tuning ────────────────────────────────────────────
+      # Number of threads to use for inference
+      # Recommended: CPU core count - 1 (e.g., 7 on 8-core)
+      # Set to 0 to auto-detect
+      N_THREADS: "0"
+
+      # Number of threads for batch processing (can differ from N_THREADS)
+      # Recommended: same as N_THREADS or N_THREADS - 1
+      N_THREADS_BATCH: "0"
+
+      # ─── GPU Acceleration (NVIDIA CUDA) ────────────────────────────────────
+      # GPU layer offloading flag (ngl):
+      #   - 0: Disable GPU (CPU-only mode) [DEFAULT]
+      #   - 10-20: Partial offloading (some layers on GPU)
+      #   - 33+: Full offloading (all layers + KV cache on GPU)
+      # Requires NVIDIA GPU + CUDA support in container
+      # Uncomment to enable:
+      # N_GPU_LAYERS: "33"
+
+      # CUDA device to use (for multi-GPU setups)
+      # Uncomment and set to GPU index (0, 1, etc.):
+      # CUDA_VISIBLE_DEVICES: "0"
+
+      # ─── GPU Acceleration (Apple Metal) ────────────────────────────────────
+      # macOS GPU offloading flag. Uncomment on Apple Silicon/Intel Mac:
+      # GGML_METAL: "1"
+
+      # ─── Quantization & Precision ──────────────────────────────────────────
+      # Dtype for computation. Options:
+      #   - f32: Full precision (slower, more accurate)
+      #   - f16: Half precision (faster, less accurate)
+      #   - q8: 8-bit quantization (fast)
+      # Recommended: f16
+      DTYPE: "f16"
+
+      # ─── Generation Parameters ──────────────────────────────────────────────
+      # Temperature (creativity vs consistency)
+      # 0.0 = deterministic, 0.7 = balanced, 1.5 = creative
+      TEMPERATURE: "0.7"
+
+      # Top-K sampling: keep top K tokens
+      TOP_K: "40"
+
+      # Top-P (nucleus) sampling: keep cumulative probability P
+      TOP_P: "0.9"
+
+      # Minimum probability threshold
+      MIN_P: "0.05"
+
+      # ─── Server Configuration ──────────────────────────────────────────────
+      # Host to bind (0.0.0.0 = all interfaces, 127.0.0.1 = localhost only)
+      # Security: use 127.0.0.1 for local-only access
+      HOST: "0.0.0.0"
+
+      # Port to listen on
+      PORT: "8000"
+
+      # Number of concurrent requests to handle
+      PARALLELS: "1"
+
+      # Slots for sequence processing (for concurrent requests)
+      N_PREDICT: "128"
+
+      # ─── Logging & Debugging ──────────────────────────────────────────────
+      # Log level: 0 = silent, 1 = error, 2 = warn, 3 = info, 4 = debug
+      LOG_LEVEL: "3"
+
+      # Enable verbose output (detailed inference stats)
+      VERBOSE: "0"
+
+      # ─── Memory Optimization ──────────────────────────────────────────────
+      # Lock model to RAM (prevent swapping). Can improve latency on large models
+      # Requires sufficient RAM. Uncomment to enable:
+      # GGML_LOCK_RAM: "1"
+
+      # Use memory-mapped I/O for model loading
+      # Improves loading speed for very large models
+      # Uncomment to enable:
+      # GGML_MMAP: "1"
+
+      # ─── Flash Attention (if supported) ────────────────────────────────────
+      # Enable flash attention for faster sequence processing
+      # Requires compatible GPU. Uncomment to enable:
+      # GGML_FLASH_ATTN: "1"
+
+    # Health check: verify server responds to API
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+    # Docker resource limits (adjust to your hardware)
+    deploy:
+      resources:
+        limits:
+          cpus: "0.0"        # 0 = no CPU limit
+          memory: 16g        # Adjust based on your system RAM
+        reservations:
+          cpus: "4"
+          memory: 8g
+
+    # GPU runtime (for NVIDIA CUDA support)
+    # Uncomment if using NVIDIA GPU:
+    # runtime: nvidia
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # Graceful shutdown
+    stop_grace_period: 30s
+
+volumes:
+  kitops-cache:
+    driver: local
+
+  llama-cache:
+    driver: local

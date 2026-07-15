@@ -1,0 +1,19 @@
+version: "3.8"
+
+services:
+  codeburn:
+    build: .
+    container_name: codeburn
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:4747:4747"
+    volumes:
+      - ~/.claude:/root/.claude:ro
+      - ~/.codex:/root/.codex:ro
+      - ~/.cursor:/root/.cursor:ro
+      - ~/.kimi:/root/.kimi:ro
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

@@ -1,0 +1,149 @@
+version: "3.8"
+
+services:
+  # ────────────────────────────────────────────────────────────────────────────
+  # TRANSCRIPTS & ANALYTICS
+  # ────────────────────────────────────────────────────────────────────────────
+
+  claude-transcripts:
+    build: ./tools/transcripts/app
+    container_name: claude-transcripts
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8765:8765"
+    volumes:
+      - ~/.claude:/root/.claude:ro
+      - claude-transcripts-output:/output
+    logging: &logging_config
+      driver: "json-file"
+      options: { max-size: "10m", max-file: "3" }
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # SPENDING & TOKEN ANALYTICS
+  # ────────────────────────────────────────────────────────────────────────────
+
+  tokdash-claude:
+    build: ./tools/spending/tokdash
+    container_name: tokdash-claude
+    restart: unless-stopped
+    command: ["--bind", "0.0.0.0", "--port", "55423", "--no-open"]
+    environment:
+      TOKDASH_USAGE_DB_PATH: /data/usage.db
+    ports:
+      - "127.0.0.1:55423:55423"
+    volumes:
+      - ~/.claude:/root/.claude:ro
+      - tokdash-claude-data:/data
+    logging: *logging_config
+
+  codeburn:
+    build: ./tools/spending/codeburn
+    container_name: codeburn
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:4747:4747"
+    volumes:
+      - ~/.claude:/root/.claude:ro
+      - ~/.codex:/root/.codex:ro
+      - ~/.cursor:/root/.cursor:ro
+      - ~/.kimi:/root/.kimi:ro
+    logging: *logging_config
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # MONITORING & DASHBOARDS
+  # ────────────────────────────────────────────────────────────────────────────
+
+  claude-dashboard:
+    build: ./tools/monitoring/dashboard
+    container_name: claude-dashboard
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5173:5173"
+      - "127.0.0.1:3001:3001"
+    volumes:
+      - ~/.claude:/root/.claude:ro
+      - claude-dashboard-data:/app/data
+    environment:
+      NODE_ENV: production
+      VITE_API_URL: http://localhost:3001
+    logging: *logging_config
+
+  claude-agent-monitor:
+    build: ./tools/monitoring/agent-monitor
+    container_name: claude-agent-monitor
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:4820:4820"
+    volumes:
+      - ~/.claude:/root/.claude:ro
+      - claude-agent-monitor-data:/app/data
+    environment:
+      NODE_ENV: production
+      CLAUDE_HOME: /root/.claude
+      DASHBOARD_HOST: 0.0.0.0
+      DASHBOARD_PORT: "4820"
+    logging: *logging_config
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # OBSERVABILITY
+  # ────────────────────────────────────────────────────────────────────────────
+
+  ai-observer:
+    build: ./tools/observability/ai-observer
+    container_name: ai-observer
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:4318:4318"
+    volumes:
+      - ~/.claude:/root/.claude:ro
+      - ai-observer-data:/app/data
+    environment:
+      AI_OBSERVER_DATABASE_PATH: /app/data/ai-observer.duckdb
+      AI_OBSERVER_API_PORT: "8080"
+      AI_OBSERVER_OTLP_PORT: "4318"
+      AI_OBSERVER_LOG_LEVEL: INFO
+      AI_OBSERVER_CLAUDE_PATH: /root/.claude
+    logging: *logging_config
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # MODEL REGISTRY & INFERENCE
+  # ────────────────────────────────────────────────────────────────────────────
+
+  gguf-llama-cpp-server:
+    build: ./tools/registry/llama
+    container_name: gguf-llama-cpp-server
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./tools/registry/llama/models:/models:ro
+      - gguf-llama-cache:/cache
+    environment:
+      MODEL: /models/model.gguf
+      N_CTX: "2048"
+      N_BATCH: "512"
+      N_THREADS: "0"
+      DTYPE: "f16"
+      TEMPERATURE: "0.7"
+      TOP_K: "40"
+      TOP_P: "0.9"
+      HOST: "0.0.0.0"
+      PORT: "8000"
+      LOG_LEVEL: "3"
+      # N_GPU_LAYERS: "33"  # Uncomment for GPU offloading
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging: *logging_config
+
+volumes:
+  claude-transcripts-output:
+  tokdash-claude-data:
+  claude-dashboard-data:
+  claude-agent-monitor-data:
+  ai-observer-data:
+  gguf-llama-cache:

@@ -1,0 +1,11 @@
+version: "3.8"
+
+services:
+  ccusage:
+    build: .
+    container_name: ccusage
+    volumes:
+      - ~/.claude:/root/.claude:ro
+      - ~/.codex:/root/.codex:ro
+      - ~/.cursor:/root/.cursor:ro
+      - ~/.kimi:/root/.kimi:ro

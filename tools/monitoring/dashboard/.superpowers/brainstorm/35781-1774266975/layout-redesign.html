@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>LiveView Layout Redesign</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0a0a0f; color: #e2e8f0; font-family: 'Courier New', monospace; padding: 20px; }
+
+  h2 { color: #00ffc2; font-size: 16px; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 2px; }
+  .subtitle { color: #94a3b8; font-size: 12px; margin-bottom: 24px; }
+
+  .layouts { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+  .layout-c { grid-column: 1 / -1; }
+
+  .card {
+    background: #111827;
+    border: 2px solid #1e293b;
+    border-radius: 10px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color 0.15s, transform 0.1s;
+  }
+  .card:hover { border-color: #00ffc240; transform: translateY(-1px); }
+  .card.selected { border-color: #00ffc2; background: #0d1f1a; }
+
+  .card-label {
+    padding: 12px 16px 0;
+    font-size: 11px;
+    color: #00ffc2;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .card-desc {
+    padding: 6px 16px 12px;
+    font-size: 11px;
+    color: #64748b;
+    line-height: 1.5;
+  }
+  .badge { display: inline-block; font-size: 9px; padding: 2px 7px; border-radius: 3px; margin-top: 4px; }
+  .badge-rec { background: #0d2a1a; color: #00ffc2; border: 1px solid #00ffc230; }
+  .badge-alt { background: #1e1a2d; color: #818cf8; border: 1px solid #818cf830; }
+  .badge-min { background: #1a1a2d; color: #64748b; border: 1px solid #33384530; }
+
+  /* ── Mockup Pieces ────────────────────────────────── */
+  .mock {
+    padding: 10px;
+    background: #0d1117;
+  }
+
+  /* Shared UI atoms */
+  .ui-header {
+    height: 28px; background: #111827; border-bottom: 1px solid #1e293b;
+    display: flex; align-items: center; padding: 0 10px; gap: 6px;
+    font-size: 9px; color: #94a3b8;
+  }
+  .ui-dot { width: 6px; height: 6px; border-radius: 50%; background: #00ffc2; }
+  .ui-dot.orange { background: #f87171; }
+
+  /* Game canvas mockup */
+  .ui-canvas {
+    background: #0d1117;
+    position: relative;
+    overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .ui-canvas canvas { display: block; }
+  .ui-canvas-label {
+    position: absolute; top: 6px; left: 8px;
+    font-size: 8px; color: #00ffc290; text-transform: uppercase; letter-spacing: 1px;
+  }
+  .ui-canvas-nav {
+    position: absolute; bottom: 6px; right: 8px; display: flex; gap: 3px;
+  }
+  .ui-nav-dot {
+    width: 5px; height: 5px; border-radius: 50%;
+    background: #00ffc230; border: 1px solid #00ffc260;
+  }
+  .ui-nav-dot.active { background: #00ffc2; }
+
+  /* Feed panel pieces */
+  .ui-feed { background: #0d1117; overflow: hidden; }
+  .ui-feed-header {
+    padding: 6px 10px; font-size: 8px; color: #00ffc2;
+    text-transform: uppercase; letter-spacing: 1px;
+    border-bottom: 1px solid #1e293b;
+  }
+  .ui-agent-card {
+    margin: 5px; padding: 6px 8px;
+    background: #111827; border: 1px solid #1e293b; border-radius: 5px;
+    display: flex; gap: 6px; align-items: flex-start;
+  }
+  .ui-agent-sprite {
+    width: 16px; height: 20px; background: #00ffc220;
+    border: 1px solid #00ffc240; border-radius: 2px; flex-shrink: 0;
+  }
+  .ui-agent-sprite.orange { background: #f8717120; border-color: #f8717140; }
+  .ui-agent-sprite.purple { background: #818cf820; border-color: #818cf840; }
+  .ui-agent-info { flex: 1; min-width: 0; }
+  .ui-agent-name { font-size: 7px; color: #94a3b8; }
+  .ui-agent-task { font-size: 7px; color: #475569; margin-top: 2px; }
+  .ui-chip {
+    display: inline-block; font-size: 6px; padding: 1px 5px; border-radius: 2px;
+    background: #1e293b; color: #64748b; margin-top: 3px;
+  }
+  .ui-chip.haiku { background: #1a1a2d; color: #818cf8; }
+  .ui-chip.sonnet { background: #0d2a1a; color: #00ffc2; }
+
+  .ui-mission {
+    margin: 5px; padding: 6px 8px;
+    background: #0d1f2d; border: 1px solid #00ffc230; border-radius: 5px;
+  }
+  .ui-mission-title { font-size: 7px; color: #00ffc2; }
+  .ui-mission-agents { display: flex; gap: 3px; margin-top: 4px; flex-wrap: wrap; }
+  .ui-mission-agent { width: 18px; height: 22px; background: #1e293b; border-radius: 2px; border: 1px solid #334155; }
+
+  .ui-activity-item {
+    padding: 4px 10px; font-size: 7px; color: #475569;
+    border-bottom: 1px solid #1e293b11;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .ui-activity-item.recent { color: #94a3b8; }
+
+  .ui-divider { height: 1px; background: #1e293b; margin: 0; }
+
+  .section-label {
+    font-size: 7px; color: #475569; text-transform: uppercase;
+    letter-spacing: 1px; padding: 4px 8px;
+  }
+
+  .select-hint { text-align: center; font-size: 11px; color: #475569; margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<h2>LiveView Layout Redesign</h2>
+<p class="subtitle">The office is alive — now make it the centerpiece. Pick the layout that feels right.</p>
+
+<div class="layouts">
+
+  <!-- Option A: 60/40 Side by Side -->
+  <div class="card" data-choice="a" onclick="selectCard(this)">
+    <div class="card-label">A — Big Office Left, Feed Right</div>
+    <div class="card-desc">
+      Game world takes 60% of the width at full view height. Right panel stacks War Room → Missions → Activity Log in a scrollable column.
+      <br><span class="badge badge-rec">Recommended</span>
+    </div>
+    <div class="mock">
+      <div class="ui-header">
+        <div class="ui-dot"></div>
+        <span>LIVE ACTIVITY · STREAMING</span>
+        <span style="margin-left:auto;color:#64748b">Activity Log ▼</span>
+      </div>
+      <div style="display:flex;height:340px;">
+
+        <!-- Left: big canvas -->
+        <div class="ui-canvas" style="flex:0 0 60%;border-right:1px solid #1e293b;">
+          <canvas id="canvasA" width="280" height="320" style="width:100%;height:100%;image-rendering:pixelated"></canvas>
+          <div class="ui-canvas-label">CORE OPS</div>
+          <div class="ui-canvas-nav">
+            <div class="ui-nav-dot active"></div>
+            <div class="ui-nav-dot"></div>
+            <div class="ui-nav-dot"></div>
+            <div class="ui-nav-dot"></div>
+            <div class="ui-nav-dot"></div>
+            <div class="ui-nav-dot"></div>
+          </div>
+        </div>
+
+        <!-- Right: feed panel -->
+        <div class="ui-feed" style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+          <div class="ui-feed-header">WAR ROOM <span style="color:#00ffc2">3</span></div>
+          <div class="ui-agent-card">
+            <div class="ui-agent-sprite"></div>
+            <div class="ui-agent-info">
+              <div class="ui-agent-name">THE HAWK · code-reviewer</div>
+              <div class="ui-agent-task">Review game engine code quality</div>
+              <span class="ui-chip haiku">haiku</span>
+            </div>
+          </div>
+          <div class="ui-agent-card">
+            <div class="ui-agent-sprite orange"></div>
+            <div class="ui-agent-info">
+              <div class="ui-agent-name">THE FIXER · build-error-resolver</div>
+              <div class="ui-agent-task">Fix TS/build errors in game engine</div>
+              <span class="ui-chip haiku">haiku</span>
+            </div>
+          </div>
+          <div class="ui-agent-card">
+            <div class="ui-agent-sprite purple"></div>
+            <div class="ui-agent-info">
+              <div class="ui-agent-name">FIELD OPS · general-purpose</div>
+              <div class="ui-agent-task">Build Pokemon-style game world</div>
+              <span class="ui-chip sonnet">sonnet</span>
+            </div>
+          </div>
+          <div class="ui-divider"></div>
+          <div class="ui-feed-header">PROMPT MISSIONS <span style="color:#00ffc2">2</span></div>
+          <div class="ui-mission">
+            <div class="ui-mission-title">SENIOR DEV · "Build game world"</div>
+            <div class="ui-mission-agents">
+              <div class="ui-mission-agent"></div>
+              <div class="ui-mission-agent"></div>
+              <div class="ui-mission-agent"></div>
+              <div class="ui-mission-agent"></div>
+            </div>
+          </div>
+          <div class="ui-divider"></div>
+          <div class="section-label">ACTIVITY LOG</div>
+          <div style="flex:1;overflow-y:auto;">
+            <div class="ui-activity-item recent">tool_use · code-reviewer · 1m ago</div>
+            <div class="ui-activity-item recent">routing_event · 2m ago</div>
+            <div class="ui-activity-item">agent_spawned · general-purpose</div>
+            <div class="ui-activity-item">tool_use · planner · 5m ago</div>
+            <div class="ui-activity-item">assistant · Senior Dev · 6m ago</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Option B: Fullscreen office + floating HUD -->
+  <div class="card" data-choice="b" onclick="selectCard(this)">
+    <div class="card-label">B — Immersive Office + Overlay HUD</div>
+    <div class="card-desc">
+      Office fills the entire LiveView. War Room cards float as a collapsible HUD overlay in the bottom-right corner. Activity Log slides in from the right.
+      <br><span class="badge badge-alt">Most immersive</span>
+    </div>
+    <div class="mock">
+      <div class="ui-header">
+        <div class="ui-dot"></div>
+        <span>LIVE ACTIVITY · STREAMING</span>
+        <span style="margin-left:auto;color:#64748b">☰ HUD</span>
+      </div>
+      <div style="position:relative;height:340px;overflow:hidden;">
+
+        <!-- Full-width canvas -->
+        <div class="ui-canvas" style="width:100%;height:100%;">
+          <canvas id="canvasB" width="340" height="340" style="width:100%;height:100%;image-rendering:pixelated"></canvas>
+          <div class="ui-canvas-label">CORE OPS ← → EXTENDED</div>
+        </div>
+
+        <!-- Floating HUD bottom-right -->
+        <div style="position:absolute;bottom:8px;right:8px;width:160px;background:#0d1117ee;border:1px solid #00ffc230;border-radius:6px;backdrop-filter:blur(4px);">
+          <div style="padding:5px 8px;font-size:7px;color:#00ffc2;border-bottom:1px solid #1e293b;">WAR ROOM 3</div>
+          <div class="ui-agent-card" style="margin:3px;">
+            <div class="ui-agent-sprite" style="width:12px;height:15px;"></div>
+            <div class="ui-agent-info">
+              <div class="ui-agent-name">code-reviewer</div>
+              <div class="ui-agent-task">Review engine code</div>
+            </div>
+          </div>
+          <div class="ui-agent-card" style="margin:3px;">
+            <div class="ui-agent-sprite orange" style="width:12px;height:15px;"></div>
+            <div class="ui-agent-info">
+              <div class="ui-agent-name">build-error-resolver</div>
+              <div class="ui-agent-task">Fix TS errors</div>
+            </div>
+          </div>
+          <div style="padding:4px 8px;font-size:6px;color:#475569;text-align:center;">+ 1 more agent</div>
+        </div>
+
+        <!-- Room indicator dots top-center -->
+        <div style="position:absolute;top:8px;left:50%;transform:translateX(-50%);display:flex;gap:4px;">
+          <div class="ui-nav-dot active"></div>
+          <div class="ui-nav-dot"></div>
+          <div class="ui-nav-dot"></div>
+          <div class="ui-nav-dot"></div>
+          <div class="ui-nav-dot"></div>
+          <div class="ui-nav-dot"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Option C: Stacked — Office top, feed bottom tabs -->
+  <div class="card layout-c" data-choice="c" onclick="selectCard(this)">
+    <div class="card-label">C — Tall Office Top, Tabbed Feed Below</div>
+    <div class="card-desc">
+      Office gets a tall viewport (400-500px) centered on screen. Below it: a tabbed panel switching between War Room / Missions / Activity Log. Keeps current vertical layout but fixes the size problem.
+      <br><span class="badge badge-min">Minimal change</span>
+    </div>
+    <div class="mock">
+      <div class="ui-header">
+        <div class="ui-dot"></div>
+        <span>LIVE ACTIVITY · STREAMING</span>
+        <span style="margin-left:auto;color:#64748b">Activity Log ▼</span>
+      </div>
+      <!-- Tall canvas -->
+      <div class="ui-canvas" style="height:180px;width:100%;border-bottom:1px solid #1e293b;">
+        <canvas id="canvasC" width="460" height="180" style="width:100%;height:100%;image-rendering:pixelated"></canvas>
+        <div class="ui-canvas-label">CORE OPS</div>
+        <div class="ui-canvas-nav">
+          <div class="ui-nav-dot active"></div>
+          <div class="ui-nav-dot"></div><div class="ui-nav-dot"></div>
+          <div class="ui-nav-dot"></div><div class="ui-nav-dot"></div>
+          <div class="ui-nav-dot"></div>
+        </div>
+      </div>
+      <!-- Tabs -->
+      <div style="display:flex;border-bottom:1px solid #1e293b;background:#0d1117;">
+        <div style="padding:5px 12px;font-size:8px;color:#00ffc2;border-bottom:1px solid #00ffc2;">WAR ROOM 3</div>
+        <div style="padding:5px 12px;font-size:8px;color:#475569;">MISSIONS 2</div>
+        <div style="padding:5px 12px;font-size:8px;color:#475569;">ACTIVITY</div>
+      </div>
+      <!-- Tab content -->
+      <div style="display:flex;gap:6px;padding:6px;overflow-x:auto;">
+        <div class="ui-agent-card" style="margin:0;flex:0 0 auto;width:150px;">
+          <div class="ui-agent-sprite"></div>
+          <div class="ui-agent-info">
+            <div class="ui-agent-name">THE HAWK · code-reviewer</div>
+            <div class="ui-agent-task">Review game engine quality</div>
+            <span class="ui-chip haiku">haiku</span>
+          </div>
+        </div>
+        <div class="ui-agent-card" style="margin:0;flex:0 0 auto;width:150px;">
+          <div class="ui-agent-sprite orange"></div>
+          <div class="ui-agent-info">
+            <div class="ui-agent-name">THE FIXER · build-error</div>
+            <div class="ui-agent-task">Fix TS errors in engine</div>
+            <span class="ui-chip haiku">haiku</span>
+          </div>
+        </div>
+        <div class="ui-agent-card" style="margin:0;flex:0 0 auto;width:150px;">
+          <div class="ui-agent-sprite purple"></div>
+          <div class="ui-agent-info">
+            <div class="ui-agent-name">FIELD OPS · general</div>
+            <div class="ui-agent-task">Build Pokemon game world</div>
+            <span class="ui-chip sonnet">sonnet</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<p class="select-hint">Click a layout to select, then reply in the terminal</p>
+
+<script>
+const S = 10;
+
+// ── Canvas A: single room zoomed in (60% left panel) ─────────────────────
+(function() {
+  const c = document.getElementById('canvasA');
+  const ctx = c.getContext('2d');
+  let t = 0;
+
+  const agents = [
+    { x: 40, y: 60, tx: 40, ty: 60, color: '#00ffc2', label: 'planner' },
+    { x: 120, y: 60, tx: 200, ty: 130, color: '#818cf8', label: 'debugger' },
+    { x: 200, y: 60, tx: 120, ty: 60, color: '#f87171', label: 'test-writer' },
+    { x: 60, y: 150, tx: 60, ty: 150, color: '#fbbf24', label: 'commit' },
+    { x: 180, y: 150, tx: 40, ty: 200, color: '#a78bfa', label: 'security' },
+  ];
+
+  agents.forEach((ag, i) => {
+    setInterval(() => {
+      ag.tx = 20 + Math.random() * 240;
+      ag.ty = 40 + Math.random() * 240;
+    }, 2000 + i * 700);
+  });
+
+  function draw(t) {
+    ctx.clearRect(0, 0, c.width, c.height);
+    // Floor
+    for (let r = 0; r < 32; r++) for (let col = 0; col < 32; col++) {
+      ctx.fillStyle = (r + col) % 2 === 0 ? '#0d1117' : '#0f1419';
+      ctx.fillRect(col * S, r * S, S, S);
+    }
+    // Walls
+    ctx.fillStyle = '#0f3460'; ctx.fillRect(0, 0, c.width, S*2);
+    ctx.fillStyle = '#00ffc210'; ctx.fillRect(0, 0, c.width, S*2);
+    ctx.fillStyle = '#00ffc2'; ctx.fillRect(0, S*2-2, c.width, 2);
+    // Room label
+    ctx.fillStyle = '#00ffc280'; ctx.font = 'bold 10px Courier New';
+    ctx.fillText('CORE OPS', 8, 16);
+
+    // Desks (larger, more visible)
+    [[30,40],[110,40],[190,40],[50,140],[170,140],[100,200]].forEach(([dx,dy]) => {
+      ctx.fillStyle = '#1a2634'; ctx.fillRect(dx, dy, 60, 30);
+      ctx.fillStyle = '#243040'; ctx.fillRect(dx+4, dy+4, 52, 22);
+      // Monitor glow
+      const flicker = Math.sin(t * 0.05 + dx) > 0.9 ? 0.4 : 0.9;
+      ctx.fillStyle = '#00ffc2'; ctx.globalAlpha = flicker;
+      ctx.fillRect(dx+14, dy+6, 28, 14);
+      ctx.globalAlpha = 1;
+      // Server racks
+      ctx.fillStyle = '#0a1520'; ctx.fillRect(dx-10, dy, 8, 30);
+      for (let i = 0; i < 5; i++) {
+        ctx.fillStyle = i % 2 === 0 ? '#00ffc2' : '#1e2a3a';
+        ctx.globalAlpha = 0.6; ctx.fillRect(dx-9, dy+2+i*5, 6, 3); ctx.globalAlpha = 1;
+      }
+    });
+
+    // Agents
+    agents.forEach(ag => {
+      const dx2 = ag.tx - ag.x, dy2 = ag.ty - ag.y;
+      const dist = Math.sqrt(dx2*dx2 + dy2*dy2);
+      if (dist > 1) { ag.x += dx2/dist * 1.5; ag.y += dy2/dist * 1.5; }
+
+      // Shadow
+      ctx.fillStyle='#000'; ctx.globalAlpha=0.2;
+      ctx.beginPath(); ctx.ellipse(ag.x+6,ag.y+22,8,3,0,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha=1;
+
+      // Legs
+      const walk = Math.floor(t/8) % 2;
+      ctx.fillStyle='#334155';
+      ctx.fillRect(ag.x+(walk?2:3), ag.y+16, 5, 7);
+      ctx.fillRect(ag.x+(walk?9:8), ag.y+16, 5, 7);
+
+      // Body
+      ctx.fillStyle=ag.color; ctx.globalAlpha=0.9;
+      ctx.fillRect(ag.x+1, ag.y+8, 14, 10);
+      ctx.globalAlpha=1;
+
+      // Head
+      ctx.fillStyle='#f5d0a9'; ctx.fillRect(ag.x+2, ag.y, 12, 10);
+      // Blink
+      const blink = Math.floor(t/90)%8===0;
+      ctx.fillStyle='#1a1a1a';
+      if(!blink) { ctx.fillRect(ag.x+4,ag.y+4,3,3); ctx.fillRect(ag.x+9,ag.y+4,3,3); }
+      else { ctx.fillRect(ag.x+4,ag.y+5,3,1); ctx.fillRect(ag.x+9,ag.y+5,3,1); }
+
+      // Name tag
+      ctx.fillStyle=ag.color; ctx.font='7px Courier New';
+      ctx.fillText(ag.label, ag.x-4, ag.y-3);
+    });
+  }
+
+  function loop() { t++; draw(t); requestAnimationFrame(loop); }
+  loop();
+})();
+
+// ── Canvas B: fullscreen wider view ──────────────────────────────────────
+(function() {
+  const c = document.getElementById('canvasB');
+  const ctx = c.getContext('2d');
+  let t = 0, camX = 0, targetX = 0;
+
+  const agents = [
+    { x: 50, y: 80, tx: 50, ty: 80, color: '#00ffc2', label: 'planner' },
+    { x: 150, y: 120, tx: 220, ty: 80, color: '#f87171', label: 'debugger' },
+    { x: 300, y: 80, tx: 300, ty: 80, color: '#fbbf24', label: 'architect' },
+    { x: 250, y: 200, tx: 180, ty: 200, color: '#818cf8', label: 'tdd-guide' },
+  ];
+
+  agents.forEach((ag, i) => {
+    setInterval(() => { ag.tx = 30 + Math.random() * 290; ag.ty = 40 + Math.random() * 260; }, 2500 + i*600);
+  });
+
+  setInterval(() => { targetX = targetX === 0 ? 170 : 0; }, 4000);
+
+  function draw(t) {
+    ctx.clearRect(0, 0, c.width, c.height);
+    camX += (targetX - camX) * 0.03;
+    ctx.save(); ctx.translate(-camX, 0);
+
+    // Two rooms side by side
+    [
+      { ox: 0, label: 'CORE OPS', floor: '#0d1117', floor2: '#0f1419', wall: '#0f3460', accent: '#00ffc2' },
+      { ox: 175, label: 'EXTENDED', floor: '#1a1a0d', floor2: '#1e1e10', wall: '#3a2d1a', accent: '#fbbf24' },
+    ].forEach(({ox, label, floor, floor2, wall, accent}) => {
+      for (let r=0;r<34;r++) for (let col=0;col<18;col++) {
+        ctx.fillStyle=(r+col)%2===0?floor:floor2;
+        ctx.fillRect(ox+col*S,r*S,S,S);
+      }
+      ctx.fillStyle=wall; ctx.fillRect(ox,0,180,S*2);
+      ctx.fillStyle=accent+'20'; ctx.fillRect(ox,0,180,S*2);
+      ctx.fillStyle=accent; ctx.fillRect(ox,S*2-2,180,2);
+      ctx.fillStyle=accent+'90'; ctx.font='bold 9px Courier New'; ctx.fillText(label,ox+6,15);
+
+      [[ox+20,40],[ox+80,40],[ox+140,40],[ox+30,140],[ox+120,140]].forEach(([dx,dy])=>{
+        ctx.fillStyle='#1a2010'; ctx.fillRect(dx,dy,50,25);
+        ctx.fillStyle=accent; ctx.globalAlpha=0.7; ctx.fillRect(dx+10,dy+5,22,12); ctx.globalAlpha=1;
+      });
+    });
+
+    agents.forEach(ag => {
+      const dx2=ag.tx-ag.x,dy2=ag.ty-ag.y,dist=Math.sqrt(dx2*dx2+dy2*dy2);
+      if(dist>1){ag.x+=dx2/dist*1.2;ag.y+=dy2/dist*1.2;}
+      ctx.fillStyle='#000'; ctx.globalAlpha=0.2;
+      ctx.beginPath(); ctx.ellipse(ag.x+6,ag.y+20,7,3,0,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1;
+      ctx.fillStyle=ag.color; ctx.globalAlpha=0.85; ctx.fillRect(ag.x+1,ag.y+7,12,9); ctx.globalAlpha=1;
+      ctx.fillStyle='#f5d0a9'; ctx.fillRect(ag.x+2,ag.y,10,8);
+      ctx.fillStyle='#1a1a1a'; ctx.fillRect(ag.x+4,ag.y+3,2,2); ctx.fillRect(ag.x+8,ag.y+3,2,2);
+      ctx.fillStyle='#334155'; ctx.fillRect(ag.x+3,ag.y+15,4,5); ctx.fillRect(ag.x+7,ag.y+15,4,5);
+      ctx.fillStyle=ag.color; ctx.font='6px Courier New'; ctx.fillText(ag.label,ag.x-2,ag.y-2);
+    });
+
+    ctx.restore();
+    // Scroll indicator
+    const pct = camX / 170;
+    ctx.fillStyle='#1e293b'; ctx.fillRect(c.width/2-40,c.height-10,80,6);
+    ctx.fillStyle='#00ffc2'; ctx.globalAlpha=0.7; ctx.fillRect(c.width/2-40,c.height-10,pct*80,6); ctx.globalAlpha=1;
+  }
+
+  function loop() { t++; draw(t); requestAnimationFrame(loop); }
+  loop();
+})();
+
+// ── Canvas C: tall single room ────────────────────────────────────────────
+(function() {
+  const c = document.getElementById('canvasC');
+  const ctx = c.getContext('2d');
+  let t = 0;
+
+  const agents = [
+    { x: 60, y: 40, tx: 60, ty: 40, color: '#00ffc2', label: 'planner' },
+    { x: 200, y: 40, tx: 150, ty: 120, color: '#818cf8', label: 'debugger' },
+    { x: 340, y: 40, tx: 340, ty: 40, color: '#f87171', label: 'test-writer' },
+    { x: 100, y: 110, tx: 250, ty: 60, color: '#fbbf24', label: 'commit' },
+  ];
+  agents.forEach((ag,i)=>{setInterval(()=>{ag.tx=20+Math.random()*420;ag.ty=30+Math.random()*130;},2200+i*500);});
+
+  function draw(t) {
+    ctx.clearRect(0,0,c.width,c.height);
+    for(let r=0;r<18;r++) for(let col=0;col<46;col++){
+      ctx.fillStyle=(r+col)%2===0?'#0d1117':'#0f1419';
+      ctx.fillRect(col*S,r*S,S,S);
+    }
+    ctx.fillStyle='#0f3460'; ctx.fillRect(0,0,c.width,S*2);
+    ctx.fillStyle='#00ffc2'; ctx.fillRect(0,S*2-2,c.width,2);
+    ctx.fillStyle='#00ffc290'; ctx.font='bold 10px Courier New'; ctx.fillText('CORE OPS',8,15);
+
+    [[40,30],[130,30],[230,30],[330,30],[60,110],[180,110],[320,110]].forEach(([dx,dy])=>{
+      ctx.fillStyle='#1a2634'; ctx.fillRect(dx,dy,70,28);
+      const flicker=Math.sin(t*.05+dx)>.9?.4:.9;
+      ctx.fillStyle='#00ffc2'; ctx.globalAlpha=flicker; ctx.fillRect(dx+14,dy+5,32,14); ctx.globalAlpha=1;
+    });
+
+    agents.forEach(ag=>{
+      const dx2=ag.tx-ag.x,dy2=ag.ty-ag.y,dist=Math.sqrt(dx2*dx2+dy2*dy2);
+      if(dist>1){ag.x+=dx2/dist*1.5;ag.y+=dy2/dist*1.5;}
+      ctx.fillStyle='#000'; ctx.globalAlpha=0.2;
+      ctx.beginPath();ctx.ellipse(ag.x+6,ag.y+20,8,3,0,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
+      ctx.fillStyle=ag.color;ctx.globalAlpha=0.9;ctx.fillRect(ag.x+1,ag.y+8,13,9);ctx.globalAlpha=1;
+      ctx.fillStyle='#f5d0a9';ctx.fillRect(ag.x+2,ag.y,11,9);
+      ctx.fillStyle='#1a1a1a';ctx.fillRect(ag.x+4,ag.y+4,2,2);ctx.fillRect(ag.x+8,ag.y+4,2,2);
+      ctx.fillStyle='#334155';ctx.fillRect(ag.x+3,ag.y+16,4,5);ctx.fillRect(ag.x+7,ag.y+16,4,5);
+      ctx.fillStyle=ag.color;ctx.font='7px Courier New';ctx.fillText(ag.label,ag.x-2,ag.y-3);
+    });
+  }
+
+  function loop(){t++;draw(t);requestAnimationFrame(loop);}
+  loop();
+})();
+
+function selectCard(el) {
+  document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  if (window.__superpowers_helper) {
+    window.__superpowers_helper.recordSelection(el.dataset.choice, el.querySelector('.card-label').textContent);
+  }
+}
+</script>
+</body>
+</html>

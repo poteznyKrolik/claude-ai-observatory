@@ -1,0 +1,345 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.26.x'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v5
+        with:
+          version: 10
+
+      - name: Install dependencies
+        run: make setup
+
+      - name: Build frontend (required for backend embed)
+        run: make frontend
+
+      - name: Run tests
+        run: make test
+
+  build:
+    name: Build (${{ matrix.goos }}/${{ matrix.goarch }})
+    runs-on: ${{ matrix.runner }}
+    needs: test
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            goos: linux
+            goarch: amd64
+            artifact_name: ai-observer
+            asset_name: ai-observer-linux-amd64
+          - runner: macos-latest
+            goos: darwin
+            goarch: arm64
+            artifact_name: ai-observer
+            asset_name: ai-observer-darwin-arm64
+          - runner: windows-latest
+            goos: windows
+            goarch: amd64
+            artifact_name: ai-observer.exe
+            asset_name: ai-observer-windows-amd64
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.26.x'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v5
+        with:
+          version: 10
+
+      - name: Get version
+        id: version
+        shell: bash
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_SHA::8}" >> $GITHUB_OUTPUT
+          fi
+          echo "commit=${GITHUB_SHA::8}" >> $GITHUB_OUTPUT
+          echo "date=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> $GITHUB_OUTPUT
+
+      - name: Install dependencies
+        run: make setup
+
+      - name: Build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 1
+          VERSION: ${{ steps.version.outputs.version }}
+          GIT_COMMIT: ${{ steps.version.outputs.commit }}
+          BUILD_DATE: ${{ steps.version.outputs.date }}
+        run: make all
+
+      - name: Verify version in binary
+        if: matrix.goos == 'linux'
+        run: |
+          ./bin/ai-observer --version
+          ./bin/ai-observer --version | grep -q "${{ steps.version.outputs.version }}" || (echo "Version mismatch!" && exit 1)
+
+      - name: Create archive
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp bin/${{ matrix.artifact_name }} ${{ matrix.artifact_name }}
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            7z a -tzip "dist/${{ matrix.asset_name }}-${{ steps.version.outputs.version }}.zip" "${{ matrix.artifact_name }}"
+          else
+            tar -czvf "dist/${{ matrix.asset_name }}-${{ steps.version.outputs.version }}.tar.gz" "${{ matrix.artifact_name }}"
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        if: github.event_name == 'push'
+        with:
+          name: ${{ matrix.asset_name }}
+          path: dist/*
+          retention-days: 1
+
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v7
+        with:
+          path: dist/
+
+      - name: Display structure
+        run: ls -R dist/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            dist/**/*.zip
+            dist/**/*.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  docker:
+    name: Docker (${{ matrix.arch }})
+    runs-on: ubuntu-latest
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set version
+        id: version
+        run: |
+          echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+          echo "commit=${GITHUB_SHA::8}" >> $GITHUB_OUTPUT
+          echo "date=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> $GITHUB_OUTPUT
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/${{ matrix.arch }}
+          push: true
+          provenance: false
+          tags: tobilg/ai-observer:${{ steps.version.outputs.version }}-${{ matrix.arch }}
+          build-args: |
+            VERSION=${{ steps.version.outputs.version }}
+            GIT_COMMIT=${{ steps.version.outputs.commit }}
+            BUILD_DATE=${{ steps.version.outputs.date }}
+            TARGETARCH=${{ matrix.arch }}
+
+  docker-manifest:
+    name: Docker Manifest
+    runs-on: ubuntu-latest
+    needs: docker
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Set version
+        id: version
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Create and push version manifest
+        run: |
+          docker manifest create tobilg/ai-observer:${{ steps.version.outputs.version }} \
+            tobilg/ai-observer:${{ steps.version.outputs.version }}-amd64 \
+            tobilg/ai-observer:${{ steps.version.outputs.version }}-arm64
+          docker manifest push tobilg/ai-observer:${{ steps.version.outputs.version }}
+
+      - name: Create and push latest manifest
+        run: |
+          docker manifest create tobilg/ai-observer:latest \
+            tobilg/ai-observer:${{ steps.version.outputs.version }}-amd64 \
+            tobilg/ai-observer:${{ steps.version.outputs.version }}-arm64
+          docker manifest push tobilg/ai-observer:latest
+
+  homebrew:
+    name: Update Homebrew Formula
+    runs-on: ubuntu-latest
+    needs: release
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Extract version
+        id: version
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Wait for release assets
+        run: sleep 30
+
+      - name: Download release asset
+        run: |
+          curl -sL -o ai-observer.tar.gz \
+            "https://github.com/tobilg/ai-observer/releases/download/v${{ steps.version.outputs.version }}/ai-observer-darwin-arm64-v${{ steps.version.outputs.version }}.tar.gz"
+
+      - name: Calculate SHA256
+        id: sha
+        run: echo "sha256=$(shasum -a 256 ai-observer.tar.gz | cut -d ' ' -f 1)" >> $GITHUB_OUTPUT
+
+      - name: Checkout tap repo
+        uses: actions/checkout@v6
+        with:
+          repository: tobilg/homebrew-ai-observer
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: tap
+
+      - name: Update formula
+        run: |
+          cat > tap/Formula/ai-observer.rb << 'FORMULA_EOF'
+          class AiObserver < Formula
+            desc "Single binary OpenTelemetry-compatible observability backend for AI coding tools like Claude Code, Codex CLI and Gemini CLI"
+            homepage "https://github.com/tobilg/ai-observer"
+            version "${{ steps.version.outputs.version }}"
+            license "MIT"
+
+            on_macos do
+              on_arm do
+                url "https://github.com/tobilg/ai-observer/releases/download/v#{version}/ai-observer-darwin-arm64-v#{version}.tar.gz"
+                sha256 "${{ steps.sha.outputs.sha256 }}"
+              end
+            end
+
+            def install
+              bin.install "ai-observer"
+              (var/"ai-observer").mkpath
+              (var/"log").mkpath
+            end
+
+            service do
+              run [opt_bin/"ai-observer"]
+              keep_alive true
+              working_dir var/"ai-observer"
+              log_path var/"log/ai-observer.log"
+              error_log_path var/"log/ai-observer.log"
+              environment_variables AI_OBSERVER_API_PORT: "8080", AI_OBSERVER_OTLP_PORT: "4318", AI_OBSERVER_DATABASE_PATH: "#{HOMEBREW_PREFIX}/var/ai-observer/ai-observer.duckdb"
+            end
+
+            def caveats
+              <<~EOS
+                AI Observer runs two servers in a single process:
+                  - Port 4318: OTLP ingestion (traces, metrics, logs)
+                  - Port 8080: Dashboard and API
+
+                Configure via environment variables:
+                  export AI_OBSERVER_API_PORT=8080
+                  export AI_OBSERVER_OTLP_PORT=4318
+                  export AI_OBSERVER_DATABASE_PATH=./data/ai-observer.duckdb
+
+                To start ai-observer as a background service:
+                  brew services start ai-observer
+
+                To stop the service:
+                  brew services stop ai-observer
+
+                To restart the service:
+                  brew services restart ai-observer
+
+                Or run manually:
+                  ai-observer
+
+                Logs are written to:
+                  #{var}/log/ai-observer.log
+
+                Database is stored at:
+                  #{var}/ai-observer/ai-observer.duckdb
+              EOS
+            end
+
+            test do
+              assert_match "ai-observer", shell_output("#{bin}/ai-observer --help 2>&1", 2)
+            end
+          end
+          FORMULA_EOF
+
+      - name: Commit and push
+        run: |
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/ai-observer.rb
+          git diff --staged --quiet || git commit -m "Update ai-observer to v${{ steps.version.outputs.version }}"
+          git push

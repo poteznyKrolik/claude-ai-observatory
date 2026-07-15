@@ -1,0 +1,142 @@
+<h2>Plumbob Marker Style</h2>
+<p class="subtitle">When an agent goes active, a marker floats above their sprite. Which style fits the CAST HQ vibe?</p>
+
+<style>
+  .plumbob-grid { display: flex; gap: 32px; justify-content: center; flex-wrap: wrap; margin: 32px 0; }
+  .plumbob-demo { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .plumbob-label { font-size: 11px; color: #88A3D6; letter-spacing: 0.08em; text-transform: uppercase; font-family: 'Courier New', monospace; }
+
+  /* Agent sprite stub */
+  .sprite-stub { width: 24px; height: 30px; background: #252830; border: 1px solid #374151; image-rendering: pixelated; position: relative; }
+
+  /* A: Pixel diamond (4x4 pixel grid, Sims classic) */
+  .plumbob-a { position: relative; }
+  .diamond-pixel {
+    display: grid; grid-template-columns: repeat(5, 6px); grid-template-rows: repeat(5, 6px);
+    image-rendering: pixelated; animation: float-a 1.2s steps(3) infinite;
+  }
+  @keyframes float-a { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+  .dp { width: 6px; height: 6px; }
+
+  /* B: CSS clip-path diamond (smooth geometry, rotated square) */
+  .plumbob-b {
+    width: 16px; height: 16px;
+    clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+    animation: float-b 1s ease-in-out infinite, spin-b 3s linear infinite;
+  }
+  @keyframes float-b { 0%,100% { transform: translateY(0) rotate(45deg); } 50% { transform: translateY(-5px) rotate(45deg); } }
+  @keyframes spin-b { from { filter: hue-rotate(0deg); } to { filter: hue-rotate(30deg); } }
+
+  /* C: Chevron / caret (↑ pixel art, simpler) */
+  .plumbob-c {
+    font-size: 22px; line-height: 1; animation: float-c 1s steps(2) infinite;
+    text-shadow: 0 0 8px currentColor;
+    image-rendering: pixelated;
+  }
+  @keyframes float-c { 0%,100% { transform: translateY(0px); } 50% { transform: translateY(-3px); } }
+
+  /* D: Glowing orb / circle with pulse ring */
+  .plumbob-d-wrap { position: relative; display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; }
+  .plumbob-d {
+    width: 10px; height: 10px; border-radius: 50%; animation: float-d 1.4s ease-in-out infinite;
+  }
+  .plumbob-d-ring {
+    position: absolute; width: 20px; height: 20px; border-radius: 50%; border: 1px solid currentColor;
+    animation: ring-pulse 1.4s ease-in-out infinite; opacity: 0;
+  }
+  @keyframes float-d { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+  @keyframes ring-pulse { 0% { transform: scale(0.5); opacity: 0.8; } 100% { transform: scale(1.6); opacity: 0; } }
+
+  .vertical-stack { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+</style>
+
+<div class="plumbob-grid">
+
+  <!-- A: Pixel diamond -->
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Pixel Diamond</h3>
+      <p>Classic Sims plumbob — 5×5 pixel grid diamond, steps() animation, pure 8-bit. Floats in accent color above sprite.</p>
+      <div class="plumbob-demo" style="margin-top:16px;">
+        <div class="plumbob-a">
+          <div class="diamond-pixel">
+            <div class="dp" style="background:transparent"></div><div class="dp" style="background:transparent"></div><div class="dp" style="background:#00FFC2"></div><div class="dp" style="background:transparent"></div><div class="dp" style="background:transparent"></div>
+            <div class="dp" style="background:transparent"></div><div class="dp" style="background:#00FFC2"></div><div class="dp" style="background:#00ffc288"></div><div class="dp" style="background:#00FFC2"></div><div class="dp" style="background:transparent"></div>
+            <div class="dp" style="background:#00FFC2"></div><div class="dp" style="background:#00ffc288"></div><div class="dp" style="background:#00ffc255"></div><div class="dp" style="background:#00ffc288"></div><div class="dp" style="background:#00FFC2"></div>
+            <div class="dp" style="background:transparent"></div><div class="dp" style="background:#00FFC2"></div><div class="dp" style="background:#00ffc288"></div><div class="dp" style="background:#00FFC2"></div><div class="dp" style="background:transparent"></div>
+            <div class="dp" style="background:transparent"></div><div class="dp" style="background:transparent"></div><div class="dp" style="background:#00FFC2"></div><div class="dp" style="background:transparent"></div><div class="dp" style="background:transparent"></div>
+          </div>
+        </div>
+        <div class="sprite-stub"></div>
+        <div class="plumbob-label">accent color per agent</div>
+      </div>
+      <div class="pros-cons" style="margin-top:12px;">
+        <div class="pros"><h4>Pros</h4><ul><li>Most authentic Sims reference</li><li>Fits 8-bit aesthetic</li><li>steps() = crisp pixel motion</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Small at scale=2 sprites</li><li>More CSS to maintain</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- B: Smooth rotating diamond -->
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Rotating Diamond</h3>
+      <p>CSS clip-path rotated square, smooth float + slow rotation. More modern/polished than pixel grid.</p>
+      <div class="plumbob-demo" style="margin-top:16px;">
+        <div style="width:20px; height:20px; display:flex; align-items:center; justify-content:center;">
+          <div class="plumbob-b" style="background: #00FFC2; box-shadow: 0 0 10px #00FFC288;"></div>
+        </div>
+        <div class="sprite-stub"></div>
+        <div class="plumbob-label">smooth ease-in-out + hue shift</div>
+      </div>
+      <div class="pros-cons" style="margin-top:12px;">
+        <div class="pros"><h4>Pros</h4><ul><li>Clean, bold shape</li><li>Readable at any scale</li><li>Glow looks great on dark bg</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Smooth animation breaks 8-bit feel</li><li>Less "Sims" reference</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- C: Pixel caret/chevron -->
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Pixel Chevron</h3>
+      <p>▲ or ◆ unicode character with text-shadow glow, steps() bounce. Ultra-simple, zero extra markup.</p>
+      <div class="plumbob-demo" style="margin-top:16px;">
+        <div class="plumbob-c" style="color:#00FFC2;">◆</div>
+        <div class="sprite-stub"></div>
+        <div class="plumbob-label">unicode + text-shadow glow</div>
+      </div>
+      <div class="pros-cons" style="margin-top:12px;">
+        <div class="pros"><h4>Pros</h4><ul><li>Lowest complexity</li><li>Works at any scale</li><li>Easy to color per-agent</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Least unique / least "Sims"</li><li>Font rendering varies by OS</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- D: Glowing orb -->
+  <div class="option" data-choice="d" onclick="toggleSelect(this)">
+    <div class="letter">D</div>
+    <div class="content">
+      <h3>Pulsing Orb</h3>
+      <p>Small glowing circle with an expanding pulse ring — like a radar ping. Float + ring-pulse animation.</p>
+      <div class="plumbob-demo" style="margin-top:16px;">
+        <div class="plumbob-d-wrap" style="color:#00FFC2;">
+          <div class="plumbob-d-ring" style="border-color:#00FFC2;"></div>
+          <div class="plumbob-d" style="background:#00FFC2; box-shadow: 0 0 8px #00FFC2;"></div>
+        </div>
+        <div class="sprite-stub"></div>
+        <div class="plumbob-label">float + expand pulse ring</div>
+      </div>
+      <div class="pros-cons" style="margin-top:12px;">
+        <div class="pros"><h4>Pros</h4><ul><li>Feels like a live signal/beacon</li><li>Fits "war room" concept</li><li>Reuses existing pulse keyframe</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Not Sims-style at all</li><li>Less distinctive</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="text-align:center; margin-top:8px;">Click your preferred style — or respond in the terminal with A/B/C/D (or a mix)</p>

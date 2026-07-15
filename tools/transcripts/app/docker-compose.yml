@@ -1,0 +1,20 @@
+version: "3.8"
+
+services:
+  claude-transcripts:
+    build: .
+    container_name: claude-transcripts
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8765:8765"
+    volumes:
+      - ~/.claude:/root/.claude:ro
+      - claude-transcripts-output:/output
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  claude-transcripts-output:

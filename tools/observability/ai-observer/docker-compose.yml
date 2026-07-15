@@ -1,0 +1,27 @@
+version: "3.8"
+
+services:
+  ai-observer:
+    build: .
+    container_name: ai-observer
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:4318:4318"
+    volumes:
+      - ~/.claude:/root/.claude:ro
+      - ai-observer-data:/app/data
+    environment:
+      AI_OBSERVER_DATABASE_PATH: /app/data/ai-observer.duckdb
+      AI_OBSERVER_API_PORT: "8080"
+      AI_OBSERVER_OTLP_PORT: "4318"
+      AI_OBSERVER_LOG_LEVEL: INFO
+      AI_OBSERVER_CLAUDE_PATH: /root/.claude
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  ai-observer-data:

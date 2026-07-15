@@ -1,0 +1,12 @@
+node_modules
+dist
+*.local
+.DS_Store
+.claude/settings.local.json
+.claude/agent-memory-local/
+.claude/plans/
+tsconfig.tsbuildinfo
+.claude/agent-status/
+
+# CAST per-phase code-review markers (transient)
+.cast-review-approval.md

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://github.com/tobilg/ai-observer#readme
+    about: Check the README for setup and usage instructions
+  - name: Discussions
+    url: https://github.com/tobilg/ai-observer/discussions
+    about: Ask questions or discuss ideas with the community

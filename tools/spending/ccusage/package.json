@@ -1,0 +1,21 @@
+{
+	"name": "ccusage-monorepo",
+	"version": "20.0.17",
+	"private": true,
+	"workspaces": [
+		"apps/*",
+		"docs",
+		"packages/*"
+	],
+	"type": "module",
+	"scripts": {
+		"preinstall": "npx only-allow pnpm"
+	},
+	"dependencies": {},
+	"devDependencies": {
+		"@types/node": "catalog:types",
+		"changelogithub": "catalog:release",
+		"pkg-pr-new": "catalog:release"
+	},
+	"packageManager": "pnpm@11.6.0"
+}
