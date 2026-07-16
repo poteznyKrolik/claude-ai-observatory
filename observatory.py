@@ -34,6 +34,7 @@ class Service:
 # Service registry
 SERVICES = {
     "transcripts": Service("Claude Transcripts", "claude-transcripts", "analytics", 8765, "HTML transcript generator"),
+    "ccrecall": Service("CCRecall", "ccrecall", "transcripts", 0, "SQLite transcript storage & recall"),
     "codeburn": Service("CodeBurn", "codeburn", "analytics", 4747, "Spending breakdown by task/tool/model"),
     "tokdash": Service("Tokdash", "tokdash-claude", "analytics", 55423, "Token usage dashboard"),
     "dashboard": Service("Claude Dashboard", "claude-dashboard", "monitoring", 5173, "Full observability UI"),
@@ -45,8 +46,8 @@ SERVICES = {
 PRESETS = {
     "all": list(SERVICES.keys()),
     "analytics": ["transcripts", "codeburn", "tokdash"],
+    "transcripts": ["transcripts", "ccrecall"],
     "monitoring": ["dashboard", "agent-monitor", "observer"],
-    "transcripts": ["transcripts"],
     "integrations": ["chatgpt"],
 }
 

@@ -109,35 +109,80 @@ services:
   # ────────────────────────────────────────────────────────────────────────────
   # MODEL REGISTRY & INFERENCE
   # ────────────────────────────────────────────────────────────────────────────
+  # Note: GGUF server requires separate setup via tools/registry/llama/docker-compose.yml
+  # Run separately with: cd tools/registry/llama && docker compose up -d
+  # gguf-llama-cpp-server:
+  #   build: ./tools/registry/llama
+  #   container_name: gguf-llama-cpp-server
+  #   restart: unless-stopped
+  #   ports:
+  #     - "127.0.0.1:8000:8000"
+  #   volumes:
+  #     - ./tools/registry/llama/models:/models:ro
+  #     - gguf-llama-cache:/cache
+  #   environment:
+  #     MODEL: /models/model.gguf
+  #     N_CTX: "2048"
+  #     N_BATCH: "512"
+  #     N_THREADS: "0"
+  #     DTYPE: "f16"
+  #     TEMPERATURE: "0.7"
+  #     TOP_K: "40"
+  #     TOP_P: "0.9"
+  #     HOST: "0.0.0.0"
+  #     PORT: "8000"
+  #     LOG_LEVEL: "3"
+  #     # N_GPU_LAYERS: "33"  # Uncomment for GPU offloading
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/health"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #     start_period: 30s
+  #   logging: *logging_config
 
-  gguf-llama-cpp-server:
-    build: ./tools/registry/llama
-    container_name: gguf-llama-cpp-server
+  # ────────────────────────────────────────────────────────────────────────────
+  # TRANSCRIPT STORAGE & ARCHIVAL
+  # ────────────────────────────────────────────────────────────────────────────
+
+  ccrecall:
+    build: ./tools/external/ccrecall
+    container_name: ccrecall
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:8000:8000"
     volumes:
-      - ./tools/registry/llama/models:/models:ro
-      - gguf-llama-cache:/cache
+      - ~/.claude:/root/.claude:ro
+      - ccrecall-data:/data
     environment:
-      MODEL: /models/model.gguf
-      N_CTX: "2048"
-      N_BATCH: "512"
-      N_THREADS: "0"
-      DTYPE: "f16"
-      TEMPERATURE: "0.7"
-      TOP_K: "40"
-      TOP_P: "0.9"
-      HOST: "0.0.0.0"
-      PORT: "8000"
-      LOG_LEVEL: "3"
-      # N_GPU_LAYERS: "33"  # Uncomment for GPU offloading
+      CCRECALL_DB: /data/ccrecall.db
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/health"]
+      test: ["CMD", "node", "./dist/index.js", "stats"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 30s
+      start_period: 20s
+    logging: *logging_config
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # EXTERNAL TOOLS & INTEGRATIONS
+  # ────────────────────────────────────────────────────────────────────────────
+
+  chatgpt-extractor:
+    build: ./tools/external/chatgpt-extractor
+    container_name: chatgpt-extractor
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5000:5000"
+    volumes:
+      - chatgpt-extractor-input:/input
+      - chatgpt-extractor-output:/output
+    environment:
+      FLASK_ENV: production
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
     logging: *logging_config
 
 volumes:
@@ -147,3 +192,6 @@ volumes:
   claude-agent-monitor-data:
   ai-observer-data:
   gguf-llama-cache:
+  chatgpt-extractor-input:
+  chatgpt-extractor-output:
+  ccrecall-data:
